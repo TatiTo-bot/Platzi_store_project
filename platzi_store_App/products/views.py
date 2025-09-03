@@ -65,19 +65,104 @@ class PlatziStoreAPI:
 # Inicializar la API
 api = PlatziStoreAPI()
 
+def filter_products(products, filters):
+    """Filtra la lista de productos según los criterios especificados"""
+    filtered_products = products.copy()
+    
+    # Filtro por búsqueda en título
+    if filters.get('search'):
+        search_term = filters['search'].lower()
+        filtered_products = [
+            product for product in filtered_products 
+            if search_term in product.get('title', '').lower()
+        ]
+    
+    # Filtro por categoría
+    if filters.get('category'):
+        category_id = int(filters['category'])
+        filtered_products = [
+            product for product in filtered_products 
+            if product.get('category', {}).get('id') == category_id
+        ]
+    
+    # Filtro por rango de precios
+    if filters.get('price_range'):
+        price_range = filters['price_range']
+        filtered_products = filter_by_price_range(filtered_products, price_range)
+    
+    return filtered_products
+
+def filter_by_price_range(products, price_range):
+    """Filtra productos por rango de precio"""
+    filtered = []
+    
+    for product in products:
+        price = float(product.get('price', 0))
+        
+        if price_range == '0-50' and 0 <= price <= 50:
+            filtered.append(product)
+        elif price_range == '50-100' and 50 < price <= 100:
+            filtered.append(product)
+        elif price_range == '100-500' and 100 < price <= 500:
+            filtered.append(product)
+        elif price_range == '500+' and price > 500:
+            filtered.append(product)
+    
+    return filtered
+
+def sort_products(products, sort_by):
+    """Ordena la lista de productos según el criterio especificado"""
+    if sort_by == 'price_asc':
+        return sorted(products, key=lambda x: float(x.get('price', 0)))
+    elif sort_by == 'price_desc':
+        return sorted(products, key=lambda x: float(x.get('price', 0)), reverse=True)
+    elif sort_by == 'name_asc':
+        return sorted(products, key=lambda x: x.get('title', '').lower())
+    elif sort_by == 'name_desc':
+        return sorted(products, key=lambda x: x.get('title', '').lower(), reverse=True)
+    else:
+        return products  # orden por defecto
+
+def get_category_count(products):
+    """Cuenta el número de categorías únicas"""
+    categories = set()
+    for product in products:
+        if product.get('category') and product['category'].get('id'):
+            categories.add(product['category']['id'])
+    return len(categories)
+
 def products(request):
-    """Vista principal para mostrar todos los productos"""
-    products_list = api.get_all_products()
+    """Vista principal para mostrar todos los productos con filtros"""
+    # Obtener todos los productos de la API
+    all_products = api.get_all_products()
+    
+    # Obtener parámetros de filtrado desde la URL
+    filters = {
+        'search': request.GET.get('search', '').strip(),
+        'category': request.GET.get('category', ''),
+        'price_range': request.GET.get('price_range', ''),
+    }
+    
+    # Aplicar filtros
+    filtered_products = filter_products(all_products, filters)
+    
+    # Aplicar ordenamiento
+    sort_by = request.GET.get('sort', 'default')
+    sorted_products = sort_products(filtered_products, sort_by)
     
     # Paginación
-    paginator = Paginator(products_list, 12)  # 12 productos por página
+    paginator = Paginator(sorted_products, 12)  # 12 productos por página
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
     context = {
         'page_obj': page_obj,
-        'total_products': len(products_list)
+        'total_products': len(all_products),
+        'filtered_count': len(filtered_products) if any(filters.values()) else None,
+        'total_categories': get_category_count(all_products),
+        'current_filters': filters,
     }
+    
     return render(request, 'products/products_list.html', context)
 
 def product_detail(request, product_id):
