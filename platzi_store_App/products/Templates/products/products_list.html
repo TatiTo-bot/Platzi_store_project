@@ -318,7 +318,7 @@ function deleteProduct(productId, productTitle) {
         cancelButtonText: 'Cancelar'
     }).then((result) => {
         if (result.isConfirmed) {
-            fetch(`/products/${productId}/delete/`, {
+            fetch(`${productId}/delete/`, {
                 method: 'POST',
                 headers: {
                     'X-CSRFToken': getCookie('csrftoken'),
