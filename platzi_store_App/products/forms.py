@@ -1,4 +1,5 @@
 from django import forms
+import requests
 
 class ProductForm(forms.Form):
     title = forms.CharField(
@@ -33,19 +34,8 @@ class ProductForm(forms.Form):
     
     category_id = forms.IntegerField(
         min_value=1,
-        max_value=5,
-        initial=1,
         label='Categoría',
-        widget=forms.Select(
-            choices=[
-                (1, 'Ropa'),
-                (2, 'Electrónicos'),
-                (3, 'Muebles'),
-                (4, 'Zapatos'),
-                (5, 'Otros')
-            ],
-            attrs={'class': 'form-select'}
-        )
+        widget=forms.Select(attrs={'class': 'form-select'})
     )
     
     image_url = forms.URLField(
@@ -56,6 +46,30 @@ class ProductForm(forms.Form):
             'placeholder': 'https://ejemplo.com/imagen.jpg'
         })
     )
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['category_id'].widget.choices = self.get_category_choices()
+    
+    def get_category_choices(self):
+        """Obtiene las categorías de la API de Platzi"""
+        try:
+            response = requests.get("https://api.escuelajs.co/api/v1/categories/")
+            if response.status_code == 200:
+                categories = response.json()
+                choices = [(category.get('id'), category.get('name')) for category in categories]
+                return choices
+        except Exception as e:
+            print(f"Error al obtener categorías: {e}")
+        
+        # Categorías por defecto si falla la API
+        return [
+            (1, 'Clothes'),
+            (2, 'Electronics'),
+            (3, 'Furniture'),
+            (4, 'Shoes'),
+            (5, 'Others')
+        ]
     
     def clean_price(self):
         price = self.cleaned_data['price']

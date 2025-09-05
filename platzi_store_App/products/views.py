@@ -31,6 +31,17 @@ class PlatziStoreAPI:
             print(f"Error al obtener producto: {e}")
             return None
     
+    def get_all_categories(self):
+        """Obtiene todas las categorías de la API"""
+        try:
+            response = requests.get(f"{self.base_url}categories/")
+            if response.status_code == 200:
+                return response.json()
+            return []
+        except Exception as e:
+            print(f"Error al obtener categorías: {e}")
+            return []
+    
     def create_product(self, product_data):
         """Crea un nuevo producto"""
         try:
@@ -64,6 +75,26 @@ class PlatziStoreAPI:
 
 # Inicializar la API
 api = PlatziStoreAPI()
+
+def get_categories_choices():
+    """Obtiene las categorías de la API y las convierte en choices para el formulario"""
+    categories = api.get_all_categories()
+    choices = []
+    
+    for category in categories:
+        choices.append((category.get('id'), category.get('name')))
+    
+    # Si no hay categorías de la API, usar las por defecto
+    if not choices:
+        choices = [
+            (1, 'Clothes'),
+            (2, 'Electronics'),
+            (3, 'Furniture'),
+            (4, 'Shoes'),
+            (5, 'Others')
+        ]
+    
+    return choices
 
 def filter_products(products, filters):
     """Filtra la lista de productos según los criterios especificados"""
@@ -136,6 +167,9 @@ def products(request):
     # Obtener todos los productos de la API
     all_products = api.get_all_products()
     
+    # Obtener categorías para el filtro
+    categories = api.get_all_categories()
+    
     # Obtener parámetros de filtrado desde la URL
     filters = {
         'search': request.GET.get('search', '').strip(),
@@ -161,6 +195,7 @@ def products(request):
         'filtered_count': len(filtered_products) if any(filters.values()) else None,
         'total_categories': get_category_count(all_products),
         'current_filters': filters,
+        'categories': categories,  # Agregar categorías al contexto
     }
     
     return render(request, 'products/products_list.html', context)
@@ -201,6 +236,10 @@ def add_product(request):
                 messages.error(request, 'Error al crear el producto')
     else:
         form = ProductForm()
+    
+    # Obtener categorías para el formulario
+    categories = get_categories_choices()
+    form.fields['category_id'].widget.choices = categories
     
     context = {
         'form': form,
@@ -244,6 +283,10 @@ def edit_product(request, product_id):
             'image_url': product.get('images', [''])[0] if product.get('images') else ''
         }
         form = ProductForm(initial=initial_data)
+    
+    # Obtener categorías para el formulario
+    categories = get_categories_choices()
+    form.fields['category_id'].widget.choices = categories
     
     context = {
         'form': form,

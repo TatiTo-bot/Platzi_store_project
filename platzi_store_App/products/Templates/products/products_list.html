@@ -21,7 +21,7 @@
     <div class="col-md-3 col-sm-6 mb-3">
         <div class="card text-center" style="background: linear-gradient(45deg, rgb(7 12 41) 0%, rgb(38 92 195) 46%, rgb(61 120 127) 100%);">
             <div class="card-body text-white">
-                <h3 class="mb-0">{{ total_categories }}</h3>
+                <h3 class="mb-0">{{ total_categories|default:0 }}</h3>
                 <p class="mb-0">Categorías</p>
             </div>
         </div>
@@ -73,11 +73,11 @@
                     <label for="category" class="form-label">Categoría</label>
                     <select name="category" id="category" class="form-select">
                         <option value="">Todas las categorías</option>
-                        <option value="1" {% if request.GET.category == "1" %}selected{% endif %}>Ropa</option>
-                        <option value="2" {% if request.GET.category == "2" %}selected{% endif %}>Electrónicos</option>
-                        <option value="3" {% if request.GET.category == "3" %}selected{% endif %}>Muebles</option>
-                        <option value="4" {% if request.GET.category == "4" %}selected{% endif %}>Zapatos</option>
-                        <option value="5" {% if request.GET.category == "5" %}selected{% endif %}>Otros</option>
+                        {% for category in categories %}
+                            <option value="{{ category.id }}" {% if request.GET.category == category.id|stringformat:"s" %}selected{% endif %}>
+                                {{ category.name }}
+                            </option>
+                        {% endfor %}
                     </select>
                 </div>
                 
