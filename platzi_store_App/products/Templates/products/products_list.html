@@ -132,10 +132,18 @@
                 <option value="name_desc" {% if request.GET.sort == "name_desc" %}selected{% endif %}>Nombre (Z-A)</option>
             </select>
         </div>
-        <a href="{% url 'products:add_product' %}" class="btn btn-primary">
+        <!-- Botón nuevo producto solo para usuarios autenticados -->
+        <a href="{% url 'products:add_product' %}" class="btn btn-primary auth-required" style="display: none;">
             <i class="fas fa-plus"></i> Nuevo Producto
         </a>
     </div>
+</div>
+
+<!-- Botón de acciones masivas solo para usuarios autenticados -->
+<div class="mb-3 auth-required" style="display: none;">
+    <button class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#bulkActionsModal">
+        <i class="fas fa-tasks"></i> Acciones masivas
+    </button>
 </div>
 
 {% if page_obj %}
@@ -143,8 +151,8 @@
         {% for product in page_obj %}
             <div class="col-lg-4 col-md-6 mb-4">
                 <div class="card h-100" style="transition: all 0.3s ease;">
-                    <!-- Checkbox para selección múltiple -->
-                    <div class="position-absolute top-0 start-0 p-2">
+                    <!-- Checkbox para selección múltiple - solo para usuarios autenticados -->
+                    <div class="position-absolute top-0 start-0 p-2 auth-required" style="display: none;">
                         <input type="checkbox" class="form-check-input product-checkbox" value="{{ product.id }}">
                     </div>
                     
@@ -176,19 +184,22 @@
                                 <h4 class="text-primary mb-0">${{ product.price }}</h4>
                                 <small class="text-muted">ID: {{ product.id }}</small>
                             </div>
-                            {%if user.is_authenticated %}
+                            
+                            <!-- Botones de acción -->
                             <div class="btn-group w-100" role="group">
+                                <!-- Botón Ver - siempre visible -->
                                 <a href="{% url 'products:product_detail' product.id %}" class="btn btn-outline-primary btn-sm" title="Ver detalles">
                                     <i class="fas fa-eye"></i> Ver
                                 </a>
-                                <a href="{% url 'products:edit_product' product.id %}" class="btn btn-outline-warning btn-sm" title="Editar producto">
+                                
+                                <!-- Botones Editar y Eliminar - solo para usuarios autenticados -->
+                                <a href="{% url 'products:edit_product' product.id %}" class="btn btn-outline-warning btn-sm auth-required" title="Editar producto" style="display: none;">
                                     <i class="fas fa-edit"></i> Editar
                                 </a>
-                                <button class="btn btn-outline-danger btn-sm" onclick="deleteProduct({{ product.id }}, '{{ product.title }}')" title="Eliminar producto">
+                                <button class="btn btn-outline-danger btn-sm auth-required" onclick="deleteProduct({{ product.id }}, '{{ product.title }}')" title="Eliminar producto" style="display: none;">
                                     <i class="fas fa-trash"></i> Eliminar
                                 </button>
                             </div>
-                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -262,7 +273,8 @@
                 {% else %}
                     <p class="text-muted">¡Comienza agregando tu primer producto!</p>
                 {% endif %}
-                <a href="{% url 'products:add_product' %}" class="btn btn-success">
+                <!-- Botón agregar producto solo para usuarios autenticados -->
+                <a href="{% url 'products:add_product' %}" class="btn btn-success auth-required" style="display: none;">
                     <i class="fas fa-plus"></i> Agregar Producto
                 </a>
             </div>
@@ -270,7 +282,7 @@
     </div>
 {% endif %}
 
-<!-- Modal para acciones masivas -->
+<!-- Modal para acciones masivas - solo para usuarios autenticados -->
 <div class="modal fade" id="bulkActionsModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -299,6 +311,57 @@
 
 {% block extra_js %}
 <script>
+// Verificar estado de autenticación cuando se carga la página
+document.addEventListener('DOMContentLoaded', function() {
+    checkAuthStatusForProducts();
+    updateSelectedCount();
+});
+
+// Función específica para products_list
+function checkAuthStatusForProducts() {
+    const token = localStorage.getItem('authToken');
+    
+    if (token) {
+        // Verificar que el token sea válido
+        fetch('/accounts/api/profile/', {
+            headers: {
+                'Authorization': `Token ${token}`
+            }
+        }).then(response => {
+            if (response.ok) {
+                // Usuario autenticado - mostrar elementos auth-required
+                showProductAuthElements();
+            } else {
+                // Token inválido - ocultar elementos auth-required
+                hideProductAuthElements();
+            }
+        }).catch(error => {
+            // Error de conexión - ocultar elementos auth-required
+            hideProductAuthElements();
+        });
+    } else {
+        // No hay token - ocultar elementos auth-required
+        hideProductAuthElements();
+    }
+}
+
+function showProductAuthElements() {
+    document.querySelectorAll('.auth-required').forEach(element => {
+        element.style.display = 'block';
+    });
+    
+    // Para botones inline en btn-group, usar inline-block
+    document.querySelectorAll('.btn-group .auth-required').forEach(element => {
+        element.style.display = 'inline-block';
+    });
+}
+
+function hideProductAuthElements() {
+    document.querySelectorAll('.auth-required').forEach(element => {
+        element.style.display = 'none';
+    });
+}
+
 // Función para ordenar productos
 function sortProducts(sortBy) {
     const url = new URL(window.location.href);
@@ -308,6 +371,13 @@ function sortProducts(sortBy) {
 
 // Función para eliminar producto individual
 function deleteProduct(productId, productTitle) {
+    const token = localStorage.getItem('authToken');
+    
+    if (!token) {
+        Swal.fire('Error', 'Debes iniciar sesión para realizar esta acción', 'error');
+        return;
+    }
+
     Swal.fire({
         title: '¿Estás seguro?',
         text: `¿Deseas eliminar el producto "${productTitle}"?`,
@@ -323,6 +393,7 @@ function deleteProduct(productId, productTitle) {
                 method: 'POST',
                 headers: {
                     'X-CSRFToken': getCookie('csrftoken'),
+                    'Authorization': `Token ${token}`,
                     'Content-Type': 'application/json',
                 },
             })
@@ -339,12 +410,13 @@ function deleteProduct(productId, productTitle) {
                 } else {
                     Swal.fire(
                         'Error',
-                        data.message,
+                        data.message || 'Error al eliminar el producto',
                         'error'
                     );
                 }
             })
             .catch(error => {
+                console.error('Error:', error);
                 Swal.fire(
                     'Error',
                     'Ocurrió un error al eliminar el producto',
@@ -356,22 +428,29 @@ function deleteProduct(productId, productTitle) {
 }
 
 // Funciones para selección múltiple
-document.addEventListener('DOMContentLoaded', function() {
+function updateSelectedCount() {
     const checkboxes = document.querySelectorAll('.product-checkbox');
     const selectedCount = document.getElementById('selectedCount');
     
-    function updateSelectedCount() {
+    function updateCount() {
         const selected = document.querySelectorAll('.product-checkbox:checked').length;
-        selectedCount.textContent = selected;
+        if (selectedCount) selectedCount.textContent = selected;
     }
     
     checkboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', updateSelectedCount);
+        checkbox.addEventListener('change', updateCount);
     });
-});
+}
 
 // Función para eliminar productos seleccionados
 function bulkDelete() {
+    const token = localStorage.getItem('authToken');
+    
+    if (!token) {
+        Swal.fire('Error', 'Debes iniciar sesión para realizar esta acción', 'error');
+        return;
+    }
+
     const selected = Array.from(document.querySelectorAll('.product-checkbox:checked')).map(cb => cb.value);
     
     if (selected.length === 0) {
@@ -397,6 +476,13 @@ function bulkDelete() {
 
 // Función para exportar productos seleccionados
 function bulkExport() {
+    const token = localStorage.getItem('authToken');
+    
+    if (!token) {
+        Swal.fire('Error', 'Debes iniciar sesión para realizar esta acción', 'error');
+        return;
+    }
+
     const selected = Array.from(document.querySelectorAll('.product-checkbox:checked')).map(cb => cb.value);
     
     if (selected.length === 0) {
@@ -434,6 +520,13 @@ document.querySelectorAll('.card').forEach(card => {
         this.style.transform = 'translateY(0)';
         this.style.boxShadow = '0 8px 30px rgba(0, 0, 0, 0.12)';
     });
+});
+
+// Actualizar estado de autenticación cuando cambie el localStorage
+window.addEventListener('storage', function(e) {
+    if (e.key === 'authToken') {
+        checkAuthStatusForProducts();
+    }
 });
 </script>
 {% endblock %}

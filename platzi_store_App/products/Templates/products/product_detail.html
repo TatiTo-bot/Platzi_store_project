@@ -72,16 +72,106 @@
                             </ul>
                         </div>
                         
+                        <!-- Botones de acción solo para usuarios autenticados -->
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            <a href="{% url 'products:edit_product' product.id %}" class="btn btn-warning me-md-2">
+                            <!-- Botón Editar - solo usuarios autenticados -->
+                            <a href="{% url 'products:edit_product' product.id %}" class="btn btn-warning me-md-2 auth-required" style="display: none;">
                                 <i class="fas fa-edit"></i> Editar Producto
                             </a>
-                            <button class="btn btn-danger" onclick="deleteProduct({{ product.id }}, '{{ product.title }}')">
+                            <!-- Botón Eliminar - solo usuarios autenticados -->
+                            <button class="btn btn-danger auth-required" onclick="deleteProduct({{ product.id }}, '{{ product.title }}')" style="display: none;">
                                 <i class="fas fa-trash"></i> Eliminar
                             </button>
                         </div>
+                        
+                        <!-- Mensaje para usuarios no autenticados -->
+                        <div id="authMessage" class="alert alert-info mt-3" style="display: none;">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>¿Quieres gestionar este producto?</strong>
+                            <br>
+                            <a href="{% url 'accounts:login' %}" class="btn btn-primary btn-sm mt-2 me-2">
+                                <i class="fas fa-sign-in-alt"></i> Iniciar sesión
+                            </a>
+                            <a href="{% url 'accounts:register' %}" class="btn btn-outline-primary btn-sm mt-2">
+                                <i class="fas fa-user-plus"></i> Registrarse
+                            </a>
+                        </div>
                     </div>
                 </div>
+            </div>
+        </div>
+        
+        <!-- Card adicional con más información del producto -->
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-info-circle text-primary me-2"></i>
+                            Detalles Técnicos
+                        </h5>
+                        <table class="table table-sm">
+                            <tbody>
+                                <tr>
+                                    <td><strong>ID del Producto:</strong></td>
+                                    <td>{{ product.id }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Precio:</strong></td>
+                                    <td class="text-success">${{ product.price }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Categoría ID:</strong></td>
+                                    <td>{{ product.category.id|default:"N/A" }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Total de Imágenes:</strong></td>
+                                    <td>{{ product.images|length }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-images text-primary me-2"></i>
+                            Galería de Imágenes
+                        </h5>
+                        {% if product.images %}
+                            <div class="row">
+                                {% for image in product.images %}
+                                    <div class="col-4 mb-2">
+                                        <img src="{{ image }}" class="img-thumbnail" style="height: 80px; width: 100%; object-fit: cover;" alt="Imagen {{ forloop.counter }}" onclick="showImageModal('{{ image }}', '{{ product.title }} - Imagen {{ forloop.counter }}')">
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="text-muted">
+                                <i class="fas fa-image me-2"></i>
+                                No hay imágenes disponibles para este producto.
+                            </p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para mostrar imagen en grande -->
+<div class="modal fade" id="imageModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="imageModalTitle">Imagen del Producto</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="modalImage" src="" class="img-fluid" alt="Imagen del producto">
             </div>
         </div>
     </div>
@@ -90,7 +180,85 @@
 
 {% block extra_js %}
 <script>
+// Verificar estado de autenticación cuando se carga la página
+document.addEventListener('DOMContentLoaded', function() {
+    checkAuthStatusForProductDetail();
+});
+
+// Función específica para product_detail
+function checkAuthStatusForProductDetail() {
+    const token = localStorage.getItem('authToken');
+    
+    if (token) {
+        // Verificar que el token sea válido
+        fetch('/accounts/api/profile/', {
+            headers: {
+                'Authorization': `Token ${token}`
+            }
+        }).then(response => {
+            if (response.ok) {
+                // Usuario autenticado - mostrar botones de editar/eliminar
+                showProductDetailAuthElements();
+            } else {
+                // Token inválido - mostrar mensaje de login
+                hideProductDetailAuthElements();
+            }
+        }).catch(error => {
+            // Error de conexión - mostrar mensaje de login
+            hideProductDetailAuthElements();
+        });
+    } else {
+        // No hay token - mostrar mensaje de login
+        hideProductDetailAuthElements();
+    }
+}
+
+function showProductDetailAuthElements() {
+    // Mostrar botones de editar/eliminar
+    document.querySelectorAll('.auth-required').forEach(element => {
+        element.style.display = element.classList.contains('btn') ? 'inline-block' : 'block';
+    });
+    
+    // Ocultar mensaje de autenticación
+    const authMessage = document.getElementById('authMessage');
+    if (authMessage) {
+        authMessage.style.display = 'none';
+    }
+}
+
+function hideProductDetailAuthElements() {
+    // Ocultar botones de editar/eliminar
+    document.querySelectorAll('.auth-required').forEach(element => {
+        element.style.display = 'none';
+    });
+    
+    // Mostrar mensaje de autenticación
+    const authMessage = document.getElementById('authMessage');
+    if (authMessage) {
+        authMessage.style.display = 'block';
+    }
+}
+
 function deleteProduct(productId, productTitle) {
+    const token = localStorage.getItem('authToken');
+    
+    if (!token) {
+        Swal.fire({
+            title: 'Autenticación requerida',
+            text: 'Debes iniciar sesión para eliminar productos',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Iniciar sesión',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#007bff'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                window.location.href = '{% url "accounts:login" %}';
+            }
+        });
+        return;
+    }
+
     Swal.fire({
         title: '¿Estás seguro?',
         text: `¿Deseas eliminar el producto "${productTitle}"?`,
@@ -106,6 +274,7 @@ function deleteProduct(productId, productTitle) {
                 method: 'POST',
                 headers: {
                     'X-CSRFToken': getCookie('csrftoken'),
+                    'Authorization': `Token ${token}`,
                     'Content-Type': 'application/json',
                 },
             })
@@ -117,17 +286,18 @@ function deleteProduct(productId, productTitle) {
                         data.message,
                         'success'
                     ).then(() => {
-                        window.location.href = '/';
+                        window.location.href = '/products/';
                     });
                 } else {
                     Swal.fire(
                         'Error',
-                        data.message,
+                        data.message || 'Error al eliminar el producto',
                         'error'
                     );
                 }
             })
             .catch(error => {
+                console.error('Error:', error);
                 Swal.fire(
                     'Error',
                     'Ocurrió un error al eliminar el producto',
@@ -152,5 +322,62 @@ function getCookie(name) {
     }
     return cookieValue;
 }
+
+// Función para mostrar imagen en modal
+function showImageModal(imageSrc, imageTitle) {
+    const modal = new bootstrap.Modal(document.getElementById('imageModal'));
+    document.getElementById('modalImage').src = imageSrc;
+    document.getElementById('imageModalTitle').textContent = imageTitle;
+    modal.show();
+}
+
+// Actualizar estado de autenticación cuando cambie el localStorage
+window.addEventListener('storage', function(e) {
+    if (e.key === 'authToken') {
+        checkAuthStatusForProductDetail();
+    }
+});
+
+// Animaciones adicionales para mejorar la UX
+document.addEventListener('DOMContentLoaded', function() {
+    // Efecto hover en las imágenes en miniatura
+    document.querySelectorAll('.img-thumbnail').forEach(img => {
+        img.addEventListener('mouseenter', function() {
+            this.style.transform = 'scale(1.1)';
+            this.style.transition = 'all 0.3s ease';
+            this.style.cursor = 'pointer';
+        });
+        
+        img.addEventListener('mouseleave', function() {
+            this.style.transform = 'scale(1)';
+        });
+    });
+    
+    // Efectos en las cards
+    document.querySelectorAll('.card').forEach(card => {
+        card.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-5px)';
+            this.style.transition = 'all 0.3s ease';
+        });
+        
+        card.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0)';
+        });
+    });
+    
+    // Lazy loading para imágenes del carousel
+    const carouselImages = document.querySelectorAll('#productCarousel img');
+    if (carouselImages.length > 0) {
+        carouselImages.forEach(img => {
+            img.addEventListener('load', function() {
+                this.style.opacity = '0';
+                this.style.transition = 'opacity 0.3s ease';
+                setTimeout(() => {
+                    this.style.opacity = '1';
+                }, 100);
+            });
+        });
+    }
+});
 </script>
 {% endblock %}

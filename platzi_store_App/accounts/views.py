@@ -5,12 +5,45 @@ from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import login, logout
 from django.contrib.auth.models import User
+from django.shortcuts import render, redirect
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
 from .serializers import (
     UserRegistrationSerializer,
     UserLoginSerializer,
     UserSerializer
 )
 
+# ======= VISTAS HTML =======
+
+def login_view(request):
+    """
+    Vista para mostrar el formulario de login HTML
+    """
+    return render(request, 'accounts/login.html')
+
+def register_view(request):
+    """
+    Vista para mostrar el formulario de registro HTML
+    """
+    return render(request, 'accounts/register.html')
+
+def logout_view(request):
+    """
+    Vista para cerrar sesión y redirigir
+    """
+    # Si hay token guardado, intentamos eliminarlo del servidor
+    if request.user.is_authenticated:
+        try:
+            request.user.auth_token.delete()
+        except:
+            pass
+        logout(request)
+    
+    # Redirigir a productos
+    return redirect('products:products')
+
+# ======= VISTAS API =======
 
 @api_view(['POST'])
 @permission_classes([AllowAny])

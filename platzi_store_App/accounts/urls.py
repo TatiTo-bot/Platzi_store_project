@@ -3,7 +3,12 @@ from . import views
 
 app_name = 'accounts'
 
-urlpatterns = [  
+urlpatterns = [
+    # URLs de las páginas HTML
+    path('accounts/login/', views.login_view, name='login'),
+    path('accounts/register/', views.register_view, name='register'),
+    path('logout/', views.logout_view, name='logout'),
+    
     # URLs de la API de autenticación
     path('api/register/', views.register_api, name='api_register'),
     path('api/login/', views.login_api, name='api_login'),
